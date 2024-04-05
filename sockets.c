@@ -39,33 +39,36 @@ int crear_conexion(t_config *config, char *key_ip, char *key_puerto, t_log *logg
 					servinfo->ai_socktype,
 					servinfo->ai_protocol);
 
+	log_info(logger, "Cliente %d creado con exito.", sc);
+	log_info(logger, "Cliente %d: Voy a iniciar la conexion con el servidor en %s:%s.", sc, ip, puerto);
 	int connection = connect(sc, servinfo->ai_addr, servinfo->ai_addrlen);
 	if (connection == -1)
 	{
-		log_error(logger, "Cliente: Fallo la conexion, se cierra el cliente.");
+		log_error(logger, "Cliente %d: Fallo la conexion con el servidor %s:%s, se cierra el cliente.", sc, ip, puerto);
 		return -1;
 	}
-	log_info(logger, "Cliente: Pude establecer conexion con el servidor");
+	log_info(logger, "Cliente %d: Pude establecer conexion con el servidor %s:%s.", sc, ip, puerto);
 	freeaddrinfo(servinfo);
 
 	// handshake
 	uint32_t handshake = 1;
 	uint32_t result;
-	log_info(logger, "Cliente: Tratando de hacer el handshake");
+	log_info(logger, "Cliente %d: Voy a hacer el handshake.", sc);
 	send(sc, &handshake, sizeof(uint32_t), NULL);
 	recv(sc, &result, sizeof(uint32_t), MSG_WAITALL);
 	if (result == -1)
 	{
-		log_error(logger, "Cliente: error al hacer el handshake");
+		log_error(logger, "Cliente %d: Error al hacer el handshake con el servidor. Se cierra la conexion", sc);
 		return -1;
 	}
 
-	log_info(logger, "Cliente: handshake exitoso");
+	log_info(logger, "Cliente %d: handshake exitoso con el servidor.", sc);
 	return sc;
 }
 
-void enviar_mensaje(char *mensaje, int socket_cliente)
+void enviar_mensaje(char *mensaje, int socket_cliente, t_log logger)
 {
+	log_debug(logger, "Mediante el socket \"%d\", se va a enviar el mensaje \"%s\".", mensaje);
 	t_paquete *paquete = malloc(sizeof(t_paquete));
 
 	paquete->codigo_operacion = MENSAJE;
@@ -75,11 +78,11 @@ void enviar_mensaje(char *mensaje, int socket_cliente)
 	memcpy(paquete->buffer->stream, mensaje, paquete->buffer->size);
 
 	int bytes = paquete->buffer->size + 2 * sizeof(int);
-	printf("SIZE BYTES: %d\n", bytes);
+	log_debug(logger, "Size del mensaje a enviar: %d.", bytes);
 	void *a_enviar = serializar_paquete(paquete, bytes);
 
 	int c = send(socket_cliente, a_enviar, bytes, 0);
-	printf("BYTES ENVIADOS: %d\n", c);
+	log_debug(logger, "Bytes enviados en el mensaje: %d\n.", c);
 	free(a_enviar);
 	eliminar_paquete(paquete);
 }
@@ -109,15 +112,17 @@ void agregar_a_paquete(t_paquete *paquete, void *valor, int tamanio)
 	paquete->buffer->size += tamanio + sizeof(int);
 }
 
-void enviar_paquete(t_paquete *paquete, int socket_cliente)
+void enviar_paquete(t_paquete *paquete, int socket_cliente, t_log logger)
 {
+	log_debug(logger, "Se va a enviar un paquete por el socket %d", socket_cliente);
 	int bytes = paquete->buffer->size + 2 * sizeof(int);
 	void *a_enviar = serializar_paquete(paquete, bytes);
-	printf("BUFFER ANTES DE ENVIAR: %d\n", paquete->buffer->size);
-	printf("BYTES ANTES DE ENVIAR: %d\n", bytes);
-	send(socket_cliente, a_enviar, bytes, 0);
-
+	log_debug(logger, "Buffer antes de enviar: %d\n", paquete->buffer->size);
+	log_debug(logger, "Bytes antes de enviar: %d\n", bytes);
+	int c = send(socket_cliente, a_enviar, bytes, 0);
+	log_debug(logger, "Bytes enviados: %d", c);
 	free(a_enviar);
+	eliminar_paquete(paquete);
 }
 
 void eliminar_paquete(t_paquete *paquete)
@@ -169,22 +174,36 @@ int iniciar_servidor(t_config *config, char *key_puerto)
 	return socket_servidor;
 }
 
-int esperar_cliente(int socket_servidor)
+int esperar_cliente(int socket_servidor, t_log *logger)
 {
-	// Aceptamos un nuevo cliente
-	int socket_cliente = accept(socket_servidor, NULL, NULL);
-	// log_info(logger, "Se conecto un cliente!");
+	uint32_t handshake = 0;
+	int socket_cliente;
 
-	// handshake
-	uint32_t handshake;
-	uint32_t resultOk = 0;
-	uint32_t resultError = -1;
+	while (handshake != 1) // si el handshake falla me quedo esperando a que llegue otro cliente
+	{
+		// Aceptamos un nuevo cliente
+		socket_cliente = accept(socket_servidor, NULL, NULL);
+		log_info(logger, "Servidor %d: Se conecto un nuevo cliente, %d.", socket_servidor, socket_cliente);
 
-	recv(socket_cliente, &handshake, sizeof(uint32_t), MSG_WAITALL);
-	if (handshake == 1)
-		send(socket_cliente, &resultOk, sizeof(uint32_t), NULL);
-	else
-		send(socket_cliente, &resultError, sizeof(uint32_t), NULL);
+		// handshake
+		uint32_t resultOk = 0;
+		uint32_t resultError = -1;
+
+		log_info(logger, "Servidor %d: Esperando el handshake del cliente %d.", socket_servidor, socket_cliente);
+
+		recv(socket_cliente, &handshake, sizeof(uint32_t), MSG_WAITALL);
+		if (handshake == 1)
+		{
+			log_info(logger, "Servidor %d: Handshake exitoso con el cliente %d.", socket_servidor, socket_cliente);
+			send(socket_cliente, &resultOk, sizeof(uint32_t), NULL);
+		}
+		else
+		{
+			log_error(logger, "Servidor %d: Error al querer hacer el handshake con el cliente %d (Mensaje recibido: \"%d\"). Se va a cerrar la conexion.", socket_servidor, handshake, socket_cliente);
+			send(socket_cliente, &resultError, sizeof(uint32_t), NULL);
+			close(socket_cliente);
+		}
+	}
 
 	return socket_cliente;
 }
@@ -192,10 +211,10 @@ int esperar_cliente(int socket_servidor)
 int recibir_operacion(int socket_cliente)
 {
 	int cod_op;
-	int sexo = recv(socket_cliente, &cod_op, sizeof(int), MSG_WAITALL);
-	if (sexo > 0)
+	int estado = recv(socket_cliente, &cod_op, sizeof(int), MSG_WAITALL);
+	if (estado > 0)
 	{
-		printf("CODIGO DE OPERACION: %d | CANT BYTES RECV: %d \n", cod_op, sexo);
+		printf("CODIGO DE OPERACION: %d | CANT BYTES RECV: %d \n", cod_op, estado);
 		int size;
 		int asd = recv(socket_cliente, &size, sizeof(int), MSG_WAITALL);
 		printf("SIZE DEL SIZE: %d | SIZE: %d\n", asd, size);
@@ -245,28 +264,6 @@ t_list *recibir_paquete(int socket_cliente)
 	}
 	free(buffer);
 	return valores;
-}
-
-uint32_t hacer_handshake_servidor(int socket_cliente, t_log *logger)
-{
-	log_info(logger, "Servidor: Empezando el handshake con el cliente.");
-	uint32_t handshake = 0;
-	uint32_t resultOk = 0;
-	uint32_t resultError = -1;
-	log_info(logger, "Servidor: Esperando el handshake.");
-	recv(socket_cliente, &handshake, sizeof(uint32_t), MSG_WAITALL);
-	if (handshake == 1)
-	{
-		log_info(logger, "Servidor: Handshake exitoso.");
-		send(socket_cliente, &resultOk, sizeof(uint32_t), NULL);
-	}
-	else
-	{
-		log_error(logger, "Servidor: Error al querer hacer el handshake con el cliente.");
-		send(socket_cliente, &resultError, sizeof(uint32_t), NULL);
-		close(socket_cliente);
-	}
-	return handshake;
 }
 
 int recibir_todo(int socket_cliente, char **buffer, t_list *valores)
