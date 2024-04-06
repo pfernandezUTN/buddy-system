@@ -208,18 +208,20 @@ int esperar_cliente(int socket_servidor, t_log *logger)
 	return socket_cliente;
 }
 
-int recibir_operacion(int socket_cliente)
+int recibir_operacion(int socket_cliente, t_log logger)
 {
 	int cod_op;
 	int estado = recv(socket_cliente, &cod_op, sizeof(int), MSG_WAITALL);
 	if (estado > 0)
 	{
-		printf("CODIGO DE OPERACION: %d | CANT BYTES RECV: %d \n", cod_op, estado);
+		log_info("Codigo de operacion recibido: %d | Cantidad de bytes recibidos: %d", cod_op, estado);
 		int size;
-		int asd = recv(socket_cliente, &size, sizeof(int), MSG_WAITALL);
-		printf("SIZE DEL SIZE: %d | SIZE: %d\n", asd, size);
+		// esto no tengo idea xq esta aca, pero bueno, por las dudas lo comento xq tecnicamente no deberia estar
+		// int asd = recv(socket_cliente, &size, sizeof(int), MSG_WAITALL);
+		// log_info(logger, "SIZE DEL SIZE: %d | SIZE: %d\n", asd, size);
 		return cod_op;
 	}
+	log_error(logger, "Error al recibir el codigo de operacion.");
 	close(socket_cliente);
 	return -1;
 }
@@ -227,10 +229,7 @@ int recibir_operacion(int socket_cliente)
 void *recibir_buffer(int *size, int socket_cliente)
 {
 	void *buffer;
-	printf("ESTOY ESPERANDO AL RECV\n");
 	int asd = recv(socket_cliente, size, sizeof(int), MSG_WAITALL);
-	printf("SIZE DEL SIZE: %d | SIZE: %d\n", asd, *size);
-	(*size) = 2;
 	buffer = malloc(*size);
 	recv(socket_cliente, buffer, *size, MSG_WAITALL);
 

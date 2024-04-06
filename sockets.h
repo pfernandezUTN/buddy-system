@@ -98,6 +98,13 @@ void eliminar_paquete(t_paquete *paquete);
 
 /** ----- FUNCIONES SERVIDOR ----- **/
 
+/**
+ * @NAME: recibir_buffer
+ * @DESC: Se encarga de sacar el buffer de los paquetes. Igual no lo vas a usar xq se usa en funciones de sockets.
+ *
+ * Ejemplo: void *buffer = recibir_buffer(&size, socket);
+ *
+ **/
 void *recibir_buffer(int *, int);
 
 /**
@@ -120,48 +127,41 @@ int iniciar_servidor(t_config *config, char *key_puerto);
 int esperar_cliente(int, t_log);
 
 /**
- * @NAME:
- * @DESC:
+ * @NAME: recibir_paquete
+ * @DESC: Mete en una t_list los valores q estan dentro del paquete. Mucho mas no hay para comentar.
  *
- * Ejemplo:
+ * Ejemplo: t_list listaDePaquetes = recibir_paquete(socket);
  *
  **/
 t_list *recibir_paquete(int);
 
 /**
- * @NAME:
- * @DESC:
+ * @NAME: recibir_mensaje
+ * @DESC: Guarda el mensaje recibido en el buffer pasado por parametro.
  *
- * Ejemplo:
+ * Ejemplo: recibir_mensaje(socket, logger, buffer);
  *
  **/
-void recibir_mensaje(int, t_log *logger, char *buffer);
+void recibir_mensaje(int socket, t_log *logger, char *buffer);
 
 /**
- * @NAME:
- * @DESC:
+ * @NAME: recibir_operacion
+ * @DESC: Esto espera que un paquete llegue al socket (es bloqueante) y devuelve el codigo de operacion del mismo. El resto del paquete queda en el socket
+ * asi que es necesario extraerlo con recibir_mensaje o recibir_paquete respectivamente.
  *
- * Ejemplo:
+ * Ejemplo: int op = recibir_operacion(socket);
  *
  **/
 int recibir_operacion(int);
 
 /**
- * @NAME:
- * @DESC:
+ * @NAME: recibir_todo
+ * @DESC: Es una implementacion rustica que combina recibir_mensaje con recibir_paquete. Usar bajo tu propia responsabilidad.
  *
- * Ejemplo:
+ * Ejemplo: int estado = recibir_todo(socket, buffer, lista_valores);
  *
  **/
 int recibir_todo(int socket_cliente, char **buffer, t_list *valores);
-
-/**
- * @NAME:
- * @DESC:
- *
- * Ejemplo:
- *
- **/
 
 #define MENSAJE 0
 #define PAQUETE 1
