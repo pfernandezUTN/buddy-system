@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netdb.h>
-// #include <string.h>
+#include <string.h>
 #include <commons/log.h>
 #include <commons/config.h>
 #include <commons/string.h>
@@ -15,7 +15,8 @@
 typedef enum
 {
 	MENSAJE,
-	PAQUETE
+	PAQUETE,
+	EXIT
 } op_code;
 
 typedef struct
@@ -49,7 +50,7 @@ int crear_conexion(t_config *config, char *key_ip, char *key_puerto, t_log *logg
  * Ejemplo: enviar_mensaje("esto es un mensaje :D", socket, logger)
  *
  **/
-void enviar_mensaje(char *mensaje, int socket_cliente, t_log logger);
+void enviar_mensaje(char *mensaje, int socket_cliente, t_log *logger);
 
 /**
  * @NAME: crear_paquete
@@ -76,16 +77,16 @@ void agregar_a_paquete(t_paquete *paquete, void *valor, int tamanio);
  * Ejemplo: enviar_paquete(paquete, socket, logger);
  *
  **/
-void enviar_paquete(t_paquete *paquete, int socket_cliente, t_log logger);
+void enviar_paquete(t_paquete *paquete, int socket_cliente, t_log *logger);
 
 /**
  * @NAME: liberar_conexion
  * @DESC: Hace toda la magia (no es mucha magia) para liberar los recursos de la conexion.
  *
- * Ejemplo: liberar_conexion(socket);
+ * Ejemplo: liberar_conexion(socket, logger);
  *
  **/
-void liberar_conexion(int socket_cliente);
+void liberar_conexion(int socket_cliente, t_log *logger);
 
 /**
  * @NAME: eliminar_paquete
@@ -124,7 +125,7 @@ int iniciar_servidor(t_config *config, char *key_puerto);
  * Ejemplo: int socket_cliente = esperar_cliente(socket_svr, logger);
  *
  **/
-int esperar_cliente(int, t_log);
+int esperar_cliente(int, t_log *);
 
 /**
  * @NAME: recibir_paquete
@@ -142,7 +143,7 @@ t_list *recibir_paquete(int);
  * Ejemplo: recibir_mensaje(socket, logger, buffer);
  *
  **/
-void recibir_mensaje(int socket, t_log *logger, char *buffer);
+char *recibir_mensaje(int socket, t_log *logger);
 
 /**
  * @NAME: recibir_operacion
@@ -152,7 +153,7 @@ void recibir_mensaje(int socket, t_log *logger, char *buffer);
  * Ejemplo: int op = recibir_operacion(socket);
  *
  **/
-int recibir_operacion(int);
+int recibir_operacion(int, t_log *);
 
 /**
  * @NAME: recibir_todo
@@ -163,8 +164,6 @@ int recibir_operacion(int);
  **/
 int recibir_todo(int socket_cliente, char **buffer, t_list *valores);
 
-#define MENSAJE 0
-#define PAQUETE 1
 #define DESCONEXION -1
 
 #endif /* SOCKETS_UTILS_H_ */

@@ -3,7 +3,7 @@
 void ejemplo_servidor()
 {
     t_log *logger = iniciar_logger("algo", "algo");
-    t_config config = config_create("algo.config");
+    t_config *config = config_create("algo.config");
 
     int socket_server = iniciar_servidor(config, "PUERTO");
     int socket_cliente = esperar_cliente(socket_server, logger); // aca esto se puede hacer para q cree un hilo cada vez q se meta un cliente para asi poder tener multiples clientes al mismo tiempo (pero en si no es necesario en el tp)
@@ -11,28 +11,31 @@ void ejemplo_servidor()
     int sigo_funcionando = 1;
     while (sigo_funcionando)
     {
-        int operacion = recibir_operacion(socket);
+        int operacion = recibir_operacion(socket_cliente, logger);
 
         switch (operacion) // MENSAJE y PAQUETE son del enum op_code de sockets.h
         {
         case MENSAJE:
-            char *mensaje = string_new();
-            recibir_mensaje(socket_cliente, logger, mensaje);
+            char *mensaje = recibir_mensaje(socket_cliente, logger);
             log_info(logger, "Recibi el mensaje: %s.", mensaje);
             // hago algo con el mensaje
             break;
         case PAQUETE:
-            t_list lista = list_create();
+            t_list *lista = list_create();
             lista = recibir_paquete(socket_cliente);
             log_info(logger, "Recibi un paquete.");
             // hago algo con el mensaje
             break;
-        default: // recibi algo q no es eso, vamos a suponer q es para terminar
-            log_error(logger, "Recibi una operacion rara, termino el servidor.");
+        case EXIT: // indica desconeccion
+            log_error(logger, "Se desconecto el cliente %d.", socket_cliente);
             sigo_funcionando = 0;
             break;
+        default: // recibi algo q no es eso, vamos a suponer q es para terminar
+            log_error(logger, "Recibi una operacion rara (%d), termino el servidor.", operacion);
+            return EXIT_FAILURE;
         }
     }
+    return 0; // EXIT_SUCCESS
 }
 
 void ejemplo_cliente()

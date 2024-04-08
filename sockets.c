@@ -4,20 +4,20 @@
  * Client
  */
 
-void *serializar_paquete(t_paquete *paquete, int bytes)
+void *serializar_paquete(t_paquete *paquete, int bytes, t_log *logger)
 {
 	void *magic = malloc(bytes);
 	int desplazamiento = 0;
 
 	memcpy(magic + desplazamiento, &(paquete->codigo_operacion), sizeof(int));
 	desplazamiento += sizeof(int);
-	printf("DESPLAZAMIENTO 1: %d\n", desplazamiento);
+	log_debug(logger, "DESPLAZAMIENTO 1: %d", desplazamiento);
 	memcpy(magic + desplazamiento, &(paquete->buffer->size), sizeof(int));
 	desplazamiento += sizeof(int);
-	printf("DESPLAZAMIENTO 2: %d\n", desplazamiento);
+	log_debug(logger, "DESPLAZAMIENTO 2: %d", desplazamiento);
 	memcpy(magic + desplazamiento, paquete->buffer->stream, paquete->buffer->size);
 	desplazamiento += paquete->buffer->size;
-	printf("DESPLAZAMIENTO FINAL (TENDRIA Q SER 10): %d\n", desplazamiento);
+	log_debug(logger, "DESPLAZAMIENTO FINAL: %d", desplazamiento);
 	return magic;
 }
 
@@ -66,9 +66,9 @@ int crear_conexion(t_config *config, char *key_ip, char *key_puerto, t_log *logg
 	return sc;
 }
 
-void enviar_mensaje(char *mensaje, int socket_cliente, t_log logger)
+void enviar_mensaje(char *mensaje, int socket_cliente, t_log *logger)
 {
-	log_debug(logger, "Mediante el socket \"%d\", se va a enviar el mensaje \"%s\".", mensaje);
+	log_info(logger, "Mediante el socket %d, se va a enviar el mensaje \"%s\".", socket_cliente, mensaje);
 	t_paquete *paquete = malloc(sizeof(t_paquete));
 
 	paquete->codigo_operacion = MENSAJE;
@@ -79,10 +79,10 @@ void enviar_mensaje(char *mensaje, int socket_cliente, t_log logger)
 
 	int bytes = paquete->buffer->size + 2 * sizeof(int);
 	log_debug(logger, "Size del mensaje a enviar: %d.", bytes);
-	void *a_enviar = serializar_paquete(paquete, bytes);
+	void *a_enviar = serializar_paquete(paquete, bytes, logger);
 
 	int c = send(socket_cliente, a_enviar, bytes, 0);
-	log_debug(logger, "Bytes enviados en el mensaje: %d\n.", c);
+	log_debug(logger, "Bytes enviados en el mensaje: %d.", c);
 	free(a_enviar);
 	eliminar_paquete(paquete);
 }
@@ -112,13 +112,13 @@ void agregar_a_paquete(t_paquete *paquete, void *valor, int tamanio)
 	paquete->buffer->size += tamanio + sizeof(int);
 }
 
-void enviar_paquete(t_paquete *paquete, int socket_cliente, t_log logger)
+void enviar_paquete(t_paquete *paquete, int socket_cliente, t_log *logger)
 {
 	log_debug(logger, "Se va a enviar un paquete por el socket %d", socket_cliente);
 	int bytes = paquete->buffer->size + 2 * sizeof(int);
-	void *a_enviar = serializar_paquete(paquete, bytes);
-	log_debug(logger, "Buffer antes de enviar: %d\n", paquete->buffer->size);
-	log_debug(logger, "Bytes antes de enviar: %d\n", bytes);
+	void *a_enviar = serializar_paquete(paquete, bytes, logger);
+	log_debug(logger, "Buffer antes de enviar: %d", paquete->buffer->size);
+	log_debug(logger, "Bytes antes de enviar: %d", bytes);
 	int c = send(socket_cliente, a_enviar, bytes, 0);
 	log_debug(logger, "Bytes enviados: %d", c);
 	free(a_enviar);
@@ -132,9 +132,15 @@ void eliminar_paquete(t_paquete *paquete)
 	free(paquete);
 }
 
-void liberar_conexion(int socket_cliente)
+void liberar_conexion(int socket_cliente, t_log *logger)
 {
-	close(socket_cliente);
+	log_debug(logger, "Cliente %d: Voy a mandarle al servidor el mensaje de EXIT.", socket_cliente);
+	// le mando al svr el mensaje de q se va a cerrar la conexion
+	int exit = EXIT; // hago esto xq como debe recibir un puntero rompe las bolas si le pongo solo el EXIT
+	send(socket_cliente, &exit, sizeof(int), 0);
+	log_debug(logger, "Cliente %d: Mensaje enviado, proceso a cerrar el socket.", socket_cliente);
+	// la cierro de este lado
+	// close(socket_cliente);
 }
 
 /**
@@ -208,7 +214,7 @@ int esperar_cliente(int socket_servidor, t_log *logger)
 	return socket_cliente;
 }
 
-int recibir_operacion(int socket_cliente, t_log logger)
+int recibir_operacion(int socket_cliente, t_log *logger)
 {
 	int cod_op;
 	int estado = recv(socket_cliente, &cod_op, sizeof(int), MSG_WAITALL);
@@ -218,7 +224,7 @@ int recibir_operacion(int socket_cliente, t_log logger)
 		int size;
 		// esto no tengo idea xq esta aca, pero bueno, por las dudas lo comento xq tecnicamente no deberia estar
 		// int asd = recv(socket_cliente, &size, sizeof(int), MSG_WAITALL);
-		// log_info(logger, "SIZE DEL SIZE: %d | SIZE: %d\n", asd, size);
+		// log_info(logger, "SIZE DEL SIZE: %d | SIZE: %d", asd, size);
 		return cod_op;
 	}
 	log_error(logger, "Error al recibir el codigo de operacion.");
@@ -236,12 +242,12 @@ void *recibir_buffer(int *size, int socket_cliente)
 	return buffer;
 }
 
-void recibir_mensaje(int socket_cliente, t_log *logger, char *buffer)
+char *recibir_mensaje(int socket_cliente, t_log *logger)
 {
 	int size;
-	buffer = recibir_buffer(&size, socket_cliente);
-	log_info(logger, "Me llego el mensaje %s", buffer);
-	free(buffer);
+	char *buffer = (char *)recibir_buffer(&size, socket_cliente);
+	log_debug(logger, "Mediante el cliente %d, me llego el mensaje \"%s\".", socket_cliente, buffer);
+	return buffer;
 }
 
 t_list *recibir_paquete(int socket_cliente)
