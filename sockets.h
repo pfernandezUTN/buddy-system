@@ -134,7 +134,7 @@ int esperar_cliente(int, t_log *);
  * Ejemplo: t_list listaDePaquetes = recibir_paquete(socket);
  *
  **/
-t_list *recibir_paquete(int);
+t_list *recibir_paquete(int, t_log *);
 
 /**
  * @NAME: recibir_mensaje

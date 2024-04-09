@@ -250,7 +250,7 @@ char *recibir_mensaje(int socket_cliente, t_log *logger)
 	return buffer;
 }
 
-t_list *recibir_paquete(int socket_cliente)
+t_list *recibir_paquete(int socket_cliente, t_log *logger)
 {
 	int size, tamanio;
 	int desplazamiento = 0;
@@ -258,12 +258,15 @@ t_list *recibir_paquete(int socket_cliente)
 	t_list *valores = list_create();
 
 	buffer = recibir_buffer(&size, socket_cliente);
+	// log_debug(logger, "Buffer obtenido: %s.", (char *)buffer);
 	while (desplazamiento < size)
 	{
 		memcpy(&tamanio, buffer + desplazamiento, sizeof(int));
+		log_debug(logger, "Tamanio obtenido: %d.", tamanio);
 		desplazamiento += sizeof(int);
-		char *valor = malloc(tamanio);
-		memcpy(valor, buffer + desplazamiento, tamanio);
+		int valor;
+		memcpy(&valor, buffer + desplazamiento, tamanio);
+		log_debug(logger, "Valor obtenido: %d.", valor);
 		desplazamiento += tamanio;
 		list_add(valores, valor);
 	}
