@@ -140,7 +140,7 @@ void liberar_conexion(int socket_cliente, t_log *logger)
 	send(socket_cliente, &exit, sizeof(int), 0);
 	log_debug(logger, "Cliente %d: Mensaje enviado, proceso a cerrar el socket.", socket_cliente);
 	// la cierro de este lado
-	// close(socket_cliente);
+	close(socket_cliente);
 }
 
 /**
